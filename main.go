@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"net-cat/server"
 	"os"
 )
 
@@ -16,4 +17,5 @@ func main() {
 	}
 
 	fmt.Printf("Listening on the port :%s\n", port)
+	server.Start(port)
 }
