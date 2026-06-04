@@ -3,6 +3,12 @@ package server
 import (
 	"log"
 	"net"
+	"sync"
+)
+
+var (
+	connectionCount int
+	mu              sync.Mutex
 )
 
 func Start(port string) {
@@ -18,6 +24,16 @@ func Start(port string) {
 			log.Println("Connection error:", err)
 			continue
 		}
+		mu.Lock()
+		if connectionCount >= 10 {
+			mu.Unlock()
+			conn.Write([]byte("Server is full. Maximum 10 connections reached.\n"))
+			conn.Close()
+			continue
+		}
+		connectionCount++
+		mu.Unlock()
+
 		_ = conn
 	}
 }
