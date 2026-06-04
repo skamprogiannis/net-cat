@@ -55,13 +55,18 @@ func Start(port string) {
 		connectionCount++
 		mu.Unlock()
 
-		_ = conn
-
 		if err := sendWelcomePrompt(conn); err != nil {
 			log.Println("Welcome message error:", err)
 			conn.Close()
 			continue
 		}
+		name, err := readClientName(conn)
+		if err != nil {
+			log.Println("Name read error:", err)
+			conn.Close()
+			continue
+		}
+		_ = name
 	}
 }
 
