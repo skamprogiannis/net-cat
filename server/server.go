@@ -15,6 +15,7 @@ type Client struct {
 }
 
 var (
+	clients         []*Client
 	connectionCount int
 	mu              sync.Mutex
 )
