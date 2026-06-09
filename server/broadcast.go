@@ -1,0 +1,19 @@
+package server
+
+import "log"
+
+func broadcast(message string, sender *Client) {
+	mu.Lock()
+	defer mu.Unlock()
+	for _, client := range clients {
+		if client == sender {
+			continue
+		}
+		_, err := client.writer.WriteString(message + "\n")
+		if err != nil {
+			log.Println("Write error for", client.name, ":", err)
+			continue
+		}
+		client.writer.Flush()
+	}
+}
