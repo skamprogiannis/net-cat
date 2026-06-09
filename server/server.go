@@ -65,16 +65,22 @@ func Start(port string) {
 
 		if err := sendWelcomePrompt(conn); err != nil {
 			log.Println("Welcome message error:", err)
+			mu.Lock()
+			connectionCount--
+			mu.Unlock()
 			conn.Close()
 			continue
 		}
 		name, err := readClientName(conn)
 		if err != nil {
 			log.Println("Name read error:", err)
+			mu.Lock()
+			connectionCount--
+			mu.Unlock()
 			conn.Close()
 			continue
 		}
-		_ = name
+		go handleClient(conn, name)
 	}
 }
 
