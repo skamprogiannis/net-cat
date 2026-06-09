@@ -1,11 +1,18 @@
 package server
 
 import (
+	"bufio"
 	"fmt"
 	"log"
 	"net"
 	"sync"
 )
+
+type Client struct {
+	conn   net.Conn
+	name   string
+	writer *bufio.Writer
+}
 
 var (
 	connectionCount int
