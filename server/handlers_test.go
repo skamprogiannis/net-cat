@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"io"
 	"net"
+	"strings"
 	"testing"
 	"time"
 )
@@ -93,12 +94,12 @@ func TestHandleClient_SkipsEmptyMessages(t *testing.T) {
 		t.Fatalf("write messages: %v", err)
 	}
 
-	got := make([]byte, len("hello\n"))
-	if _, err := io.ReadFull(clientB, got); err != nil {
+	line, err := bufio.NewReader(clientB).ReadString('\n')
+	if err != nil {
 		t.Fatalf("read broadcast: %v", err)
 	}
-	if string(got) != "hello\n" {
-		t.Fatalf("expected only trimmed message, got %q", string(got))
+	if !strings.HasSuffix(line, "][Patrick]:hello\n") {
+		t.Fatalf("expected only formatted trimmed message, got %q", line)
 	}
 
 	clientA.Close()
@@ -109,10 +110,12 @@ func resetServerState(t *testing.T) {
 	t.Helper()
 
 	clients = nil
+	messageHistory = nil
 	connectionCount = 0
 
 	t.Cleanup(func() {
 		clients = nil
+		messageHistory = nil
 		connectionCount = 0
 	})
 }

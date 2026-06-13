@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"log"
 	"net"
-	"strings"
 )
 
 func handleClient(conn net.Conn) {
@@ -38,16 +37,12 @@ func handleClient(conn net.Conn) {
 	}
 	addClient(client)
 
-	scanner := bufio.NewScanner(conn)
-	for scanner.Scan() {
-		message := strings.TrimSpace(scanner.Text())
-		if message == "" {
-			continue
-		}
-		broadcast(message, client)
+	if err := sendHistory(client); err != nil {
+		log.Println("History write error:", err)
+		return
 	}
 
-	if err := scanner.Err(); err != nil {
+	if err := handleClientMessages(client); err != nil {
 		log.Println("Client read error:", err)
 	}
 }
