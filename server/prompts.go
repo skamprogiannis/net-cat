@@ -1,8 +1,10 @@
 package server
 
 import (
+	"bufio"
 	"fmt"
 	"net"
+	"strings"
 )
 
 const welcomeMessage = "Welcome to TCP-Chat!\n" +
@@ -28,4 +30,19 @@ const namePrompt = "[ENTER YOUR NAME]: "
 func sendWelcomePrompt(conn net.Conn) error {
 	_, err := fmt.Fprint(conn, welcomeMessage, namePrompt)
 	return err
+}
+
+func readClientName(conn net.Conn) (string, error) {
+	reader := bufio.NewReader(conn)
+	for {
+		name, err := reader.ReadString('\n')
+		if err != nil {
+			return "", err
+		}
+		name = strings.TrimSpace(name)
+		if name != "" {
+			return name, nil
+		}
+		fmt.Fprint(conn, namePrompt)
+	}
 }
