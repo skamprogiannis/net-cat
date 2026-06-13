@@ -23,8 +23,8 @@ func TestWelcomeMessageContent(t *testing.T) {
 		}
 	}
 
-	if !strings.HasSuffix(welcomeMessage, "[ENTER YOUR NAME]: ") {
-		t.Fatalf("welcomeMessage should end with name prompt on same line")
+	if !strings.HasSuffix(welcomeMessage, "     `-'       `--'\n") {
+		t.Fatalf("welcomeMessage should end with logo line")
 	}
 }
 
@@ -46,13 +46,14 @@ func TestSendWelcomePromptWritesFullMessage(t *testing.T) {
 		errCh <- sendWelcomePrompt(serverConn)
 	}()
 
-	got := make([]byte, len(welcomeMessage))
+	want := welcomeMessage + namePrompt
+	got := make([]byte, len(want))
 	if _, err := io.ReadFull(clientConn, got); err != nil {
 		t.Fatalf("read welcome message: %v", err)
 	}
 
-	if string(got) != welcomeMessage {
-		t.Fatalf("sendWelcomePrompt wrote %q, want %q", string(got), welcomeMessage)
+	if string(got) != want {
+		t.Fatalf("sendWelcomePrompt wrote %q, want %q", string(got), want)
 	}
 
 	if err := <-errCh; err != nil {

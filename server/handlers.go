@@ -35,6 +35,6 @@ func readClientName(conn net.Conn) (string, error) {
 		if name != "" {
 			return name, nil
 		}
-		fmt.Fprint(conn, "[ENTER YOUR NAME]: ")
+		fmt.Fprint(conn, namePrompt)
 	}
 }

@@ -36,8 +36,9 @@ const welcomeMessage = "Welcome to TCP-Chat!\n" +
 	" |    `.       | `' \\Zq\n" +
 	"_)      \\.___.,|     .'\n" +
 	"\\____   )MMMMMP|   .'\n" +
-	"     `-'       `--'\n" +
-	"[ENTER YOUR NAME]: "
+	"     `-'       `--'\n"
+
+const namePrompt = "[ENTER YOUR NAME]: "
 
 func Start(port string) {
 	listener, err := net.Listen("tcp", ":"+port)
@@ -85,7 +86,7 @@ func Start(port string) {
 }
 
 func sendWelcomePrompt(conn net.Conn) error {
-	_, err := fmt.Fprint(conn, welcomeMessage)
+	_, err := fmt.Fprint(conn, welcomeMessage, namePrompt)
 	return err
 }
 
