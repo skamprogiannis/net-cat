@@ -11,7 +11,7 @@ func main() {
 
 	if len(os.Args) == 2 {
 		port = os.Args[1]
-	} else if len(os.Args) > 2 {
+	} else {
 		fmt.Println("[USAGE]: ./TCPChat $port")
 		os.Exit(1)
 	}
