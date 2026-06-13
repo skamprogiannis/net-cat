@@ -1,44 +1,9 @@
 package server
 
 import (
-	"bufio"
-	"fmt"
 	"log"
 	"net"
-	"sync"
 )
-
-type Client struct {
-	conn   net.Conn
-	name   string
-	writer *bufio.Writer
-}
-
-var (
-	clients         []*Client
-	connectionCount int
-	mu              sync.Mutex
-)
-
-const welcomeMessage = "Welcome to TCP-Chat!\n" +
-	"         _nnnn_\n" +
-	"        dGGGGMMb\n" +
-	"       @p~qp~~qMb\n" +
-	"       M|@||@) M|\n" +
-	"       @,----.JM|\n" +
-	"      JS^\\__/  qKL\n" +
-	"     dZP        qKRb\n" +
-	"    dZP          qKKb\n" +
-	"   fZP            SMMb\n" +
-	"   HZM            MMMM\n" +
-	"   FqM            MMMM\n" +
-	" __| \".        |\\dS\"qML\n" +
-	" |    `.       | `' \\Zq\n" +
-	"_)      \\.___.,|     .'\n" +
-	"\\____   )MMMMMP|   .'\n" +
-	"     `-'       `--'\n"
-
-const namePrompt = "[ENTER YOUR NAME]: "
 
 func Start(port string) {
 	listener, err := net.Listen("tcp", ":"+port)
@@ -83,26 +48,4 @@ func Start(port string) {
 		}
 		go handleClient(conn, name)
 	}
-}
-
-func sendWelcomePrompt(conn net.Conn) error {
-	_, err := fmt.Fprint(conn, welcomeMessage, namePrompt)
-	return err
-}
-
-func addClient(c *Client) {
-	mu.Lock()
-	clients = append(clients, c)
-	mu.Unlock()
-}
-
-func removeClient(c *Client) {
-	mu.Lock()
-	for i, client := range clients {
-		if client == c {
-			clients = append(clients[:i], clients[i+1:]...)
-			break
-		}
-	}
-	mu.Unlock()
 }
