@@ -106,6 +106,21 @@ func TestHandleClient_SkipsEmptyMessages(t *testing.T) {
 	<-done
 }
 
+func TestNotifyJoin(t *testing.T) {
+	patrick, _, _, bobConn := setupTwoClients(t)
+
+	go notifyJoin(patrick)
+
+	line, err := bufio.NewReader(bobConn).ReadString('\n')
+	if err != nil {
+		t.Fatalf("read join notification: %v", err)
+	}
+	want := "Patrick has joined our chat...\n"
+	if line != want {
+		t.Fatalf("got %q, want %q", line, want)
+	}
+}
+
 func resetServerState(t *testing.T) {
 	t.Helper()
 
