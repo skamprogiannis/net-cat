@@ -58,39 +58,9 @@ func TestReadClientName_EmptyThenValid(t *testing.T) {
 }
 
 func TestHandleClient_SkipsEmptyMessages(t *testing.T) {
-	resetServerState(t)
+	patrickConn, bobConn, done := startJoiningClient(t)
 
-	serverA, clientA := net.Pipe()
-	serverB, clientB := net.Pipe()
-
-	deadline := time.Now().Add(time.Second)
-	serverA.SetDeadline(deadline)
-	clientA.SetDeadline(deadline)
-	serverB.SetDeadline(deadline)
-	clientB.SetDeadline(deadline)
-
-	bob := &Client{conn: serverB, name: "Bob", writer: bufio.NewWriter(serverB)}
-	clients = []*Client{bob}
-	connectionCount = 1
-
-	t.Cleanup(func() {
-		serverA.Close()
-		clientA.Close()
-		serverB.Close()
-		clientB.Close()
-	})
-
-	done := make(chan struct{})
-	go func() {
-		handleClient(serverA)
-		close(done)
-	}()
-
-	readFullWelcome(t, clientA)
-	if _, err := clientA.Write([]byte("Patrick\n")); err != nil {
-		t.Fatalf("write name: %v", err)
-	}
-	reader := bufio.NewReader(clientB)
+	reader := bufio.NewReader(bobConn)
 	joinLine, err := reader.ReadString('\n')
 	if err != nil {
 		t.Fatalf("read join notification: %v", err)
@@ -99,7 +69,7 @@ func TestHandleClient_SkipsEmptyMessages(t *testing.T) {
 		t.Fatalf("expected join notification first, got %q", joinLine)
 	}
 
-	if _, err := clientA.Write([]byte("\n   \n  hello  \n")); err != nil {
+	if _, err := patrickConn.Write([]byte("\n   \n  hello  \n")); err != nil {
 		t.Fatalf("write messages: %v", err)
 	}
 
@@ -111,7 +81,7 @@ func TestHandleClient_SkipsEmptyMessages(t *testing.T) {
 		t.Fatalf("expected only formatted trimmed message, got %q", line)
 	}
 
-	clientA.Close()
+	patrickConn.Close()
 	<-done
 }
 
@@ -137,16 +107,36 @@ func TestNotifyJoin(t *testing.T) {
 }
 
 func TestHandleClient_NotifiesOnJoin(t *testing.T) {
+	patrickConn, bobConn, done := startJoiningClient(t)
+
+	line, err := bufio.NewReader(bobConn).ReadString('\n')
+	if err != nil {
+		t.Fatalf("read join notification: %v", err)
+	}
+	if line != "Patrick has joined our chat...\n" {
+		t.Fatalf("got %q, want join notification", line)
+	}
+
+	patrickConn.Close()
+	<-done
+}
+
+// startJoiningClient registers Bob as an already-connected client, then drives
+// a new client ("Patrick") through handleClient up to the moment he has joined.
+// It returns Patrick's terminal-side conn (to send messages), Bob's
+// terminal-side conn (to read what Bob receives), and a channel that is closed
+// when handleClient returns.
+func startJoiningClient(t *testing.T) (patrickConn, bobConn net.Conn, done chan struct{}) {
+	t.Helper()
 	resetServerState(t)
 
 	patrickServer, patrickConn := net.Pipe()
 	bobServer, bobConn := net.Pipe()
 
 	deadline := time.Now().Add(time.Second)
-	patrickServer.SetDeadline(deadline)
-	patrickConn.SetDeadline(deadline)
-	bobServer.SetDeadline(deadline)
-	bobConn.SetDeadline(deadline)
+	for _, c := range []net.Conn{patrickServer, patrickConn, bobServer, bobConn} {
+		c.SetDeadline(deadline)
+	}
 
 	bob := &Client{conn: bobServer, name: "Bob", writer: bufio.NewWriter(bobServer)}
 	clients = []*Client{bob}
@@ -159,7 +149,7 @@ func TestHandleClient_NotifiesOnJoin(t *testing.T) {
 		bobConn.Close()
 	})
 
-	done := make(chan struct{})
+	done = make(chan struct{})
 	go func() {
 		handleClient(patrickServer)
 		close(done)
@@ -170,16 +160,7 @@ func TestHandleClient_NotifiesOnJoin(t *testing.T) {
 		t.Fatalf("write name: %v", err)
 	}
 
-	line, err := bufio.NewReader(bobConn).ReadString('\n')
-	if err != nil {
-		t.Fatalf("read join notification: %v", err)
-	}
-	if line != "Patrick has joined our chat...\n" {
-		t.Fatalf("got %q, want join notification", line)
-	}
-
-	patrickConn.Close()
-	<-done
+	return patrickConn, bobConn, done
 }
 
 func resetServerState(t *testing.T) {
