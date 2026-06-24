@@ -118,7 +118,11 @@ func TestHandleClient_SkipsEmptyMessages(t *testing.T) {
 func TestNotifyJoin(t *testing.T) {
 	patrick, _, _, bobConn := setupTwoClients(t)
 
-	go notifyJoin(patrick)
+	done := make(chan struct{})
+	go func() {
+		notifyJoin(patrick)
+		close(done)
+	}()
 
 	line, err := bufio.NewReader(bobConn).ReadString('\n')
 	if err != nil {
@@ -128,6 +132,8 @@ func TestNotifyJoin(t *testing.T) {
 	if line != want {
 		t.Fatalf("got %q, want %q", line, want)
 	}
+
+	<-done
 }
 
 func TestHandleClient_NotifiesOnJoin(t *testing.T) {

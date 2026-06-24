@@ -36,7 +36,11 @@ func setupTwoClients(t *testing.T) (*Client, *Client, net.Conn, net.Conn) {
 func TestBroadcast_ReceiverGetsMessage(t *testing.T) {
 	patrick, _, _, clientB := setupTwoClients(t)
 
-	go broadcast("hello", patrick)
+	done := make(chan struct{})
+	go func() {
+		broadcast("hello", patrick)
+		close(done)
+	}()
 
 	buf := make([]byte, 64)
 	n, err := clientB.Read(buf)
@@ -46,17 +50,25 @@ func TestBroadcast_ReceiverGetsMessage(t *testing.T) {
 	if !strings.Contains(string(buf[:n]), "hello") {
 		t.Fatalf("expected 'hello', got '%s'", string(buf[:n]))
 	}
+
+	<-done
 }
 
 func TestBroadcast_SenderDoesNotGetMessage(t *testing.T) {
 	patrick, _, clientA, clientB := setupTwoClients(t)
 
+	readerDone := make(chan struct{})
 	go func() {
 		buf := make([]byte, 64)
 		clientB.Read(buf)
+		close(readerDone)
 	}()
 
-	go broadcast("hello", patrick)
+	broadcastDone := make(chan struct{})
+	go func() {
+		broadcast("hello", patrick)
+		close(broadcastDone)
+	}()
 
 	buf := make([]byte, 64)
 	clientA.SetDeadline(time.Now().Add(100 * time.Millisecond))
@@ -64,4 +76,7 @@ func TestBroadcast_SenderDoesNotGetMessage(t *testing.T) {
 	if n > 0 {
 		t.Fatalf("Patrick should not receive his own message")
 	}
+
+	<-broadcastDone
+	<-readerDone
 }
