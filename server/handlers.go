@@ -46,6 +46,8 @@ func handleClient(conn net.Conn) {
 		return
 	}
 
+	notifyJoin(client)
+
 	if err := handleClientMessages(client); err != nil {
 		log.Println("Client read error:", err)
 	}
