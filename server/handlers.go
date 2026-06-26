@@ -10,6 +10,10 @@ func notifyJoin(c *Client) {
 	broadcast(c.name+" has joined our chat...", c)
 }
 
+func notifyLeave(c *Client) {
+	broadcast(c.name+" has left our chat...", c)
+}
+
 func handleClient(conn net.Conn) {
 	var client *Client
 
