@@ -19,6 +19,7 @@ func handleClient(conn net.Conn) {
 
 	defer func() {
 		if client != nil {
+			notifyLeave(client)
 			removeClient(client)
 		}
 		mu.Lock()
