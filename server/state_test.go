@@ -5,6 +5,10 @@ import (
 	"testing"
 )
 
+// TestConcurrentSharedStateAccess hammers the shared state from many
+// goroutines at once to prove the mutexes prevent data races. 50 goroutines
+// is deliberate pressure (not a real client count) — more contention makes a
+// missing lock surface faster under -race.
 func TestConcurrentSharedStateAccess(t *testing.T) {
 	resetServerState(t)
 

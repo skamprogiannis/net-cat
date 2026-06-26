@@ -22,6 +22,8 @@ func handleClient(conn net.Conn) {
 			notifyLeave(client)
 			removeClient(client)
 		}
+		// Start() already incremented for every accepted conn, so always
+		// decrement here — even if the client never finished joining (client==nil).
 		mu.Lock()
 		connectionCount--
 		mu.Unlock()
