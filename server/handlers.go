@@ -16,6 +16,7 @@ func notifyLeave(c *Client) {
 
 func disconnectClient(c *Client, joined bool) {
 	if joined {
+		log.Printf("%q (%s) left the chat", c.name, c.conn.RemoteAddr())
 		notifyLeave(c)
 	}
 	removeClient(c)
@@ -38,14 +39,16 @@ func handleClient(conn net.Conn) {
 		conn.Close()
 	}()
 
+	addr := conn.RemoteAddr()
+
 	if err := sendWelcomePrompt(conn); err != nil {
-		log.Println("Welcome message error:", err)
+		log.Printf("failed to send welcome prompt to %s: %v", addr, err)
 		return
 	}
 
 	name, err := readClientName(conn)
 	if err != nil {
-		log.Println("Name read error:", err)
+		log.Printf("failed to read client name from %s: %v", addr, err)
 		return
 	}
 
@@ -57,14 +60,15 @@ func handleClient(conn net.Conn) {
 	addClient(client)
 
 	if err := sendHistory(client); err != nil {
-		log.Println("History write error:", err)
+		log.Printf("failed to send history to %q (%s): %v", name, addr, err)
 		return
 	}
 
 	notifyJoin(client)
 	joined = true
+	log.Printf("%q (%s) joined the chat", name, addr)
 
 	if err := handleClientMessages(client); err != nil {
-		log.Println("Client read error:", err)
+		log.Printf("read error for %q (%s): %v", name, addr, err)
 	}
 }

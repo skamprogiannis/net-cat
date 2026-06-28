@@ -11,9 +11,11 @@ func broadcast(message string, sender *Client) {
 		}
 		_, err := client.writer.WriteString(message + "\n")
 		if err != nil {
-			log.Println("Write error for", client.name, ":", err)
+			log.Printf("broadcast write error to %q (%s): %v", client.name, client.conn.RemoteAddr(), err)
 			continue
 		}
-		client.writer.Flush()
+		if err := client.writer.Flush(); err != nil {
+			log.Printf("broadcast flush error to %q (%s): %v", client.name, client.conn.RemoteAddr(), err)
+		}
 	}
 }

@@ -16,6 +16,5 @@ func main() {
 		os.Exit(1)
 	}
 
-	fmt.Printf("Listening on the port :%s\n", port)
 	server.Start(port)
 }
