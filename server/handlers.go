@@ -14,14 +14,22 @@ func notifyLeave(c *Client) {
 	broadcast(c.name+" has left our chat...", c)
 }
 
+func disconnectClient(c *Client, joined bool) {
+	if joined {
+		notifyLeave(c)
+	}
+	removeClient(c)
+}
+
 func handleClient(conn net.Conn) {
 	var client *Client
+	joined := false
 
 	defer func() {
 		if client != nil {
-			notifyLeave(client)
-			removeClient(client)
+			disconnectClient(client, joined)
 		}
+
 		// Start() already incremented for every accepted conn, so always
 		// decrement here — even if the client never finished joining (client==nil).
 		mu.Lock()
@@ -54,6 +62,7 @@ func handleClient(conn net.Conn) {
 	}
 
 	notifyJoin(client)
+	joined = true
 
 	if err := handleClientMessages(client); err != nil {
 		log.Println("Client read error:", err)
