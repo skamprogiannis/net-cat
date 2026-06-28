@@ -85,6 +85,47 @@ func TestHandleClient_SkipsEmptyMessages(t *testing.T) {
 	<-done
 }
 
+func TestHandleClient_DoesNotBroadcastOnlyEmptyMessages(t *testing.T) {
+	patrickConn, bobConn, done := startJoiningClient(t)
+
+	reader := bufio.NewReader(bobConn)
+	joinLine, err := reader.ReadString('\n')
+	if err != nil {
+		t.Fatalf("read join notification: %v", err)
+	}
+	if joinLine != "Patrick has joined our chat...\n" {
+		t.Fatalf("expected join notification first, got %q", joinLine)
+	}
+
+	if _, err := patrickConn.Write([]byte("\n   \n\t\n")); err != nil {
+		t.Fatalf("write empty messages: %v", err)
+	}
+
+	bobConn.SetReadDeadline(time.Now().Add(100 * time.Millisecond))
+	line, err := reader.ReadString('\n')
+	if err == nil {
+		t.Fatalf("expected no broadcast for empty messages, got %q", line)
+	}
+	if netErr, ok := err.(net.Error); !ok || !netErr.Timeout() {
+		t.Fatalf("expected timeout waiting for empty-message broadcast, got %v", err)
+	}
+
+	if err := bobConn.SetReadDeadline(time.Now().Add(time.Second)); err != nil {
+		t.Fatalf("reset Bob read deadline: %v", err)
+	}
+	patrickConn.Close()
+
+	leaveLine, err := reader.ReadString('\n')
+	if err != nil {
+		t.Fatalf("read leave notification: %v", err)
+	}
+	if leaveLine != "Patrick has left our chat...\n" {
+		t.Fatalf("got %q, want leave notification", leaveLine)
+	}
+
+	<-done
+}
+
 func TestNotifyJoin(t *testing.T) {
 	patrick, _, _, bobConn := setupTwoClients(t)
 
