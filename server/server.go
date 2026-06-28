@@ -1,6 +1,7 @@
 package server
 
 import (
+	"errors"
 	"log"
 	"net"
 )
@@ -12,9 +13,18 @@ func Start(port string) {
 	}
 	defer listener.Close()
 
+	if err := serve(listener); err != nil {
+		log.Fatal(err)
+	}
+}
+
+func serve(listener net.Listener) error {
 	for {
 		conn, err := listener.Accept()
 		if err != nil {
+			if errors.Is(err, net.ErrClosed) {
+				return nil
+			}
 			log.Println("Connection error:", err)
 			continue
 		}
