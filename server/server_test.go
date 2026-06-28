@@ -60,3 +60,81 @@ func TestSendWelcomePromptWritesFullMessage(t *testing.T) {
 		t.Fatalf("sendWelcomePrompt returned error: %v", err)
 	}
 }
+
+func TestServeAcceptsConnectionAndSendsWelcome(t *testing.T) {
+	resetServerState(t)
+
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatalf("listen on test port: %v", err)
+	}
+	t.Cleanup(func() {
+		listener.Close()
+	})
+
+	serveDone := make(chan error, 1)
+	go func() {
+		serveDone <- serve(listener)
+	}()
+
+	conn, err := net.Dial("tcp", listener.Addr().String())
+	if err != nil {
+		t.Fatalf("dial test server: %v", err)
+	}
+	t.Cleanup(func() {
+		conn.Close()
+	})
+
+	deadline := time.Now().Add(time.Second)
+	if err := conn.SetDeadline(deadline); err != nil {
+		t.Fatalf("set client deadline: %v", err)
+	}
+
+	want := welcomeMessage + namePrompt
+	got := make([]byte, len(want))
+	if _, err := io.ReadFull(conn, got); err != nil {
+		t.Fatalf("read welcome from server: %v", err)
+	}
+	if string(got) != want {
+		t.Fatalf("welcome = %q, want %q", string(got), want)
+	}
+
+	if err := conn.Close(); err != nil {
+		t.Fatalf("close client connection: %v", err)
+	}
+	if err := listener.Close(); err != nil {
+		t.Fatalf("close listener: %v", err)
+	}
+
+	select {
+	case err := <-serveDone:
+		if err != nil {
+			t.Fatalf("serve returned error: %v", err)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("serve did not stop after listener close")
+	}
+
+	waitForConnectionCount(t, 0)
+}
+
+func waitForConnectionCount(t *testing.T, want int) {
+	t.Helper()
+
+	deadline := time.Now().Add(time.Second)
+	for time.Now().Before(deadline) {
+		mu.Lock()
+		got := connectionCount
+		mu.Unlock()
+
+		if got == want {
+			return
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+
+	mu.Lock()
+	got := connectionCount
+	mu.Unlock()
+	t.Fatalf("connectionCount = %d, want %d", got, want)
+}
