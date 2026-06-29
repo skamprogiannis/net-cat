@@ -201,6 +201,19 @@ func startJoiningClient(t *testing.T) (patrickConn, bobConn net.Conn, done chan 
 		t.Fatalf("write name: %v", err)
 	}
 
+	// The server sends each client its own timestamped prompt (sendPrompt) after
+	// joining and after every message. On a synchronous net.Pipe those writes
+	// block until someone reads, so drain Patrick's side in the background; the
+	// tests only assert on what Bob receives.
+	go func() {
+		buf := make([]byte, 256)
+		for {
+			if _, err := patrickConn.Read(buf); err != nil {
+				return
+			}
+		}
+	}()
+
 	return patrickConn, bobConn, done
 }
 
