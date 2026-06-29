@@ -9,9 +9,12 @@ import (
 func main() {
 	port := "8989"
 
-	if len(os.Args) == 2 {
+	switch len(os.Args) {
+	case 1:
+		// no port specified, keep default 8989
+	case 2:
 		port = os.Args[1]
-	} else {
+	default:
 		fmt.Println("[USAGE]: ./TCPChat $port")
 		os.Exit(1)
 	}

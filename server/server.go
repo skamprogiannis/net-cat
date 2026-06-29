@@ -2,6 +2,7 @@ package server
 
 import (
 	"errors"
+	"fmt"
 	"log"
 	"net"
 )
@@ -14,7 +15,7 @@ func Start(port string) {
 	}
 	defer listener.Close()
 
-	log.Printf("server listening on :%s", port)
+	fmt.Printf("Listening on the port :%s\n", port)
 
 	if err := serve(listener); err != nil {
 		log.Fatalf("server stopped: %v", err)
