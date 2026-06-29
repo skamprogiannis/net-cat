@@ -7,6 +7,8 @@ import (
 	"time"
 )
 
+// readResult keeps a line and its read error together so an async read can send
+// one value through one channel instead of coordinating separate result streams.
 type readResult struct {
 	line string
 	err  error
@@ -19,6 +21,9 @@ func setupTwoClients(t *testing.T) (*Client, *Client, net.Conn, net.Conn) {
 	return testClients[0], testClients[1], conns[0], conns[1]
 }
 
+// setupBroadcastClients builds paired in-memory connections for broadcast
+// tests. The returned Client values use the server side of each pipe, while
+// the returned conns let the test read what each terminal-side client receives.
 func setupBroadcastClients(t *testing.T, names ...string) ([]*Client, []net.Conn) {
 	t.Helper()
 
@@ -49,6 +54,8 @@ func setupBroadcastClients(t *testing.T, names ...string) ([]*Client, []net.Conn
 	return testClients, conns
 }
 
+// readLineAsync starts the terminal-side read before broadcast writes. This
+// keeps net.Pipe tests from blocking, because pipe writes wait for a reader.
 func readLineAsync(conn net.Conn) <-chan readResult {
 	ch := make(chan readResult, 1)
 	go func() {
@@ -58,6 +65,7 @@ func readLineAsync(conn net.Conn) <-chan readResult {
 	return ch
 }
 
+// requireReadLine asserts that an async read produced want before the timeout.
 func requireReadLine(t *testing.T, ch <-chan readResult, want string) {
 	t.Helper()
 

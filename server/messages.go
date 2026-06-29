@@ -29,6 +29,8 @@ func sendHistory(client *Client) error {
 	return client.writer.Flush()
 }
 
+// handleClientMessages reads raw client input, filters empty lines at the input
+// boundary, then records and broadcasts formatted chat messages.
 func handleClientMessages(client *Client) error {
 	scanner := bufio.NewScanner(client.conn)
 	for scanner.Scan() {

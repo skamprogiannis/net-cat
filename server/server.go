@@ -21,6 +21,8 @@ func Start(port string) {
 	}
 }
 
+// serve runs the accept loop for listener. Tests call it with a listener they
+// own so they can close the listener and verify the loop exits cleanly.
 func serve(listener net.Listener) error {
 	for {
 		conn, err := listener.Accept()

@@ -14,6 +14,9 @@ func notifyLeave(c *Client) {
 	broadcast(c.name+" has left our chat...", c)
 }
 
+// disconnectClient removes the client and only announces a leave if the join
+// flow completed. Connections can fail before joining, and those should not
+// produce misleading leave messages.
 func disconnectClient(c *Client, joined bool) {
 	if joined {
 		log.Printf("%q (%s) left the chat", c.name, c.conn.RemoteAddr())
