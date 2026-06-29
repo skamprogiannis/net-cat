@@ -5,6 +5,7 @@ import (
 	"net"
 )
 
+// Client represents one connected chat participant.
 type Client struct {
 	conn   net.Conn
 	name   string

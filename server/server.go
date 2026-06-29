@@ -6,6 +6,7 @@ import (
 	"net"
 )
 
+// Start listens on port and serves incoming chat connections.
 func Start(port string) {
 	listener, err := net.Listen("tcp", ":"+port)
 	if err != nil {
