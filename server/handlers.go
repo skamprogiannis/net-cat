@@ -6,23 +6,23 @@ import (
 	"net"
 )
 
-func notifyJoin(c *Client) {
-	broadcast(c.name+" has joined our chat...", c)
+func notifyJoin(client *Client) {
+	broadcast(client.name+" has joined our chat...", client)
 }
 
-func notifyLeave(c *Client) {
-	broadcast(c.name+" has left our chat...", c)
+func notifyLeave(client *Client) {
+	broadcast(client.name+" has left our chat...", client)
 }
 
 // disconnectClient removes the client and only announces a leave if the join
 // flow completed. Connections can fail before joining, and those should not
 // produce misleading leave messages.
-func disconnectClient(c *Client, joined bool) {
+func disconnectClient(client *Client, joined bool) {
 	if joined {
-		log.Printf("%q (%s) left the chat", c.name, c.conn.RemoteAddr())
-		notifyLeave(c)
+		log.Printf("%q (%s) left the chat", client.name, client.conn.RemoteAddr())
+		notifyLeave(client)
 	}
-	removeClient(c)
+	removeClient(client)
 }
 
 func handleClient(conn net.Conn) {

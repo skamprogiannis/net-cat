@@ -12,16 +12,16 @@ type Client struct {
 	writer *bufio.Writer
 }
 
-func addClient(c *Client) {
+func addClient(client *Client) {
 	mu.Lock()
-	clients = append(clients, c)
+	clients = append(clients, client)
 	mu.Unlock()
 }
 
-func removeClient(c *Client) {
+func removeClient(client *Client) {
 	mu.Lock()
-	for i, client := range clients {
-		if client == c {
+	for i, existingClient := range clients {
+		if existingClient == client {
 			clients = append(clients[:i], clients[i+1:]...)
 			break
 		}
