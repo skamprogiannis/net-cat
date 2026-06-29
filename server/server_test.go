@@ -118,6 +118,57 @@ func TestServeAcceptsConnectionAndSendsWelcome(t *testing.T) {
 	waitForConnectionCount(t, 0)
 }
 
+func TestServe_RejectsEleventhConnection(t *testing.T) {
+	resetServerState(t)
+
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatalf("listen on test port: %v", err)
+	}
+	t.Cleanup(func() {
+		listener.Close()
+	})
+
+	go serve(listener)
+
+	// Fill all 10 slots; keep the connections open so they stay counted.
+	conns := make([]net.Conn, 0, 10)
+	for i := 0; i < 10; i++ {
+		conn, err := net.Dial("tcp", listener.Addr().String())
+		if err != nil {
+			t.Fatalf("dial connection %d: %v", i, err)
+		}
+		conns = append(conns, conn)
+	}
+
+	// Wait until the server has registered all 10 before testing the 11th.
+	waitForConnectionCount(t, 10)
+
+	// The 11th connection must be rejected with the "full" message, not served.
+	eleventh, err := net.Dial("tcp", listener.Addr().String())
+	if err != nil {
+		t.Fatalf("dial 11th connection: %v", err)
+	}
+	eleventh.SetDeadline(time.Now().Add(time.Second))
+
+	got, err := io.ReadAll(eleventh)
+	if err != nil {
+		t.Fatalf("read from 11th connection: %v", err)
+	}
+	want := "Server is full. Maximum 10 connections reached.\n"
+	if string(got) != want {
+		t.Fatalf("11th connection got %q, want %q", string(got), want)
+	}
+
+	// Drain everything and wait for the server to settle before returning, so
+	// no leftover goroutine races with resetServerState's cleanup.
+	eleventh.Close()
+	for _, conn := range conns {
+		conn.Close()
+	}
+	waitForConnectionCount(t, 0)
+}
+
 func waitForConnectionCount(t *testing.T, want int) {
 	t.Helper()
 
