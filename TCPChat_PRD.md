@@ -33,7 +33,7 @@ Our version is a fully functional **group chat server**. Think of it like a very
 The server is started like this:
 
 ```
-$ go run .
+$ go run . 8989
 Listening on the port :8989
 ```
 
@@ -135,10 +135,10 @@ Because multiple goroutines access these simultaneously, they must be protected 
 
 ```
 1. Read loop receives EOF or error — client disconnected
-2. Remove client from global client list
-3. Decrement connection counter
-4. Close the TCP connection
-5. Broadcast "X has left our chat..." to everyone remaining
+2. Broadcast "X has left our chat..." to everyone else if the client had joined
+3. Remove client from global client list
+4. Decrement connection counter
+5. Close the TCP connection
 6. Goroutine exits
 ```
 
@@ -288,7 +288,7 @@ formatted := fmt.Sprintf("[%s][%s]:%s", timestamp, clientName, message)
 
 | Scenario | Behavior |
 |----------|---------|
-| `go run .` | Use default port 8989 |
+| `go run .` | Print usage message and exit |
 | `go run . 2525` | Use port 2525 |
 | `go run . 2525 localhost` | Print usage message and exit |
 
@@ -605,18 +605,13 @@ George has left our chat...
 This is handled inside the client goroutine's cleanup logic. When the read loop exits, the cleanup sequence must run:
 
 ```go
-name := client.name
-removeClient(client.conn)
-
-mu.Lock()
-connectionCount--
-mu.Unlock()
-
-client.conn.Close()
-broadcast(name + " has left our chat...", nil)
+if joined {
+    notifyLeave(client)
+}
+removeClient(client)
 ```
 
-When broadcasting the leave message, the sender is `nil` because the leaving client's connection is already closed — passing `nil` means the message is sent to all remaining clients with no exclusion. Like the join notification, this message must not be added to history and must not include a timestamp.
+The leave message is broadcast with the leaving client as the sender, so it is sent to every other connected client. Like the join notification, this message must not be added to history and must not include a timestamp.
 
 ---
 
@@ -651,7 +646,7 @@ The `handleClient` function manages the complete lifecycle of one client connect
 4. Send message history to the new client
 5. Broadcast the join notification
 6. Enter a read loop that reads messages and broadcasts them
-7. On loop exit, run cleanup: remove client, decrement counter, broadcast leave notification
+7. On loop exit, run cleanup: broadcast leave notification for joined clients, remove client, decrement counter, and close the connection
 
 Because each client runs in its own goroutine, the main accept loop is never blocked. A slow client, a client waiting for input, or a client that crashes cannot affect any other connected client.
 
@@ -750,7 +745,7 @@ Do not log every individual chat message — that would flood the output. Log st
 
 Stefanos must write a Go unit test in a `server_test.go` file that verifies the TCP listener starts correctly and accepts connections. Use the standard `testing` package.
 
-The test should start the listener on a test port (e.g. 19999 to avoid conflicts with the default port), dial a connection to it, read the first response bytes, verify they contain the welcome message, then close everything:
+The test should start the listener on an OS-assigned local test port, dial a connection to it, read the first response bytes, verify they contain the welcome message, then close everything:
 
 ```go
 func TestServerAcceptsConnection(t *testing.T) {
@@ -866,9 +861,9 @@ Document every bug found with a short comment in the code explaining what the is
 
 The following is the complete list of behaviors the server must implement. All items are required for the project to be considered complete.
 
-- The server starts with `go run .` and listens on port 8989 by default
-- If a port argument is provided, the server listens on that port instead
-- If more than one argument is provided, the server prints the usage message and exits
+- The server starts with `go run . 8989` and listens on port 8989
+- If exactly one port argument is provided, the server listens on that port
+- If zero or more than one argument is provided, the server prints the usage message and exits
 - Upon connection, the client receives the welcome message with the Linux ASCII logo
 - The client is prompted to enter a name before joining the chat
 - Empty names are rejected and the client is re-prompted until a valid name is given
@@ -888,8 +883,9 @@ The following is the complete list of behaviors the server must implement. All i
 
 The project is complete when all of the following pass:
 
-- `go run .` starts the server on port 8989 with no errors
+- `go run . 8989` starts the server on port 8989 with no errors
 - `go run . 2525` starts the server on port 2525
+- `go run .` prints `[USAGE]: ./TCPChat $port` and exits immediately
 - `go run . 2525 localhost` prints `[USAGE]: ./TCPChat $port` and exits immediately
 - Two or more `nc` clients can connect, exchange messages, and disconnect without any server errors
 - New clients see the full chat history immediately upon joining
