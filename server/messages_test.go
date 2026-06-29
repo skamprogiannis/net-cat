@@ -11,11 +11,39 @@ import (
 func TestFormatMessage(t *testing.T) {
 	fixedTime := time.Date(2020, 1, 20, 15, 48, 41, 0, time.UTC)
 
-	got := formatMessage("Daniel", "hello", fixedTime)
-	want := "[2020-01-20 15:48:41][Daniel]:hello"
+	tests := []struct {
+		name    string
+		user    string
+		message string
+		want    string
+	}{
+		{
+			name:    "basic message",
+			user:    "Daniel",
+			message: "hello",
+			want:    "[2020-01-20 15:48:41][Daniel]:hello",
+		},
+		{
+			name:    "name with spaces",
+			user:    "Daniel Tymoshenko",
+			message: "hello",
+			want:    "[2020-01-20 15:48:41][Daniel Tymoshenko]:hello",
+		},
+		{
+			name:    "message with special characters",
+			user:    "Daniel",
+			message: "hello: [ok] #1!",
+			want:    "[2020-01-20 15:48:41][Daniel]:hello: [ok] #1!",
+		},
+	}
 
-	if got != want {
-		t.Fatalf("formatMessage() = %q, want %q", got, want)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := formatMessage(tt.user, tt.message, fixedTime)
+			if got != tt.want {
+				t.Fatalf("formatMessage() = %q, want %q", got, tt.want)
+			}
+		})
 	}
 }
 
