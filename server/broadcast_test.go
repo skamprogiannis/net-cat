@@ -80,16 +80,16 @@ func TestBroadcast_SendsToAllReceivers(t *testing.T) {
 	bobRead := readLineAsync(conns[1])
 	georgeRead := readLineAsync(conns[2])
 
-	done := make(chan struct{})
+	broadcastDone := make(chan struct{})
 	go func() {
 		broadcast("hello", testClients[0])
-		close(done)
+		close(broadcastDone)
 	}()
 
 	requireReadLine(t, bobRead, "hello\n")
 	requireReadLine(t, georgeRead, "hello\n")
 
-	<-done
+	<-broadcastDone
 }
 
 func TestBroadcast_SenderDoesNotGetMessage(t *testing.T) {
