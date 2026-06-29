@@ -11,6 +11,24 @@ func formatMessage(name, message string, t time.Time) string {
 	return fmt.Sprintf("[%s][%s]:%s", t.Format("2006-01-02 15:04:05"), name, message)
 }
 
+// formatPrompt builds the timestamped prefix shown to a client before they
+// type. Without it the sender (whom broadcast skips) only sees their terminal's
+// raw echo, with no date, while everyone else sees the formatted message.
+func formatPrompt(name string, t time.Time) string {
+	return fmt.Sprintf("[%s][%s]:", t.Format("2006-01-02 15:04:05"), name)
+}
+
+// sendPrompt writes a fresh timestamped prompt to a single client.
+func sendPrompt(client *Client) error {
+	mu.Lock()
+	defer mu.Unlock()
+
+	if _, err := client.writer.WriteString(formatPrompt(client.name, time.Now())); err != nil {
+		return err
+	}
+	return client.writer.Flush()
+}
+
 func addMessageToHistory(message string) {
 	mu.Lock()
 	messageHistory = append(messageHistory, message)
@@ -42,6 +60,11 @@ func handleClientMessages(client *Client) error {
 		formatted := formatMessage(client.name, message, time.Now())
 		addMessageToHistory(formatted)
 		broadcast(formatted, client)
+
+		// Re-prompt the sender so their next line carries a timestamp too.
+		if err := sendPrompt(client); err != nil {
+			return err
+		}
 	}
 	return scanner.Err()
 }

@@ -71,6 +71,11 @@ func handleClient(conn net.Conn) {
 	joined = true
 	log.Printf("%q (%s) joined the chat", name, addr)
 
+	if err := sendPrompt(client); err != nil {
+		log.Printf("failed to send prompt to %q (%s): %v", name, addr, err)
+		return
+	}
+
 	if err := handleClientMessages(client); err != nil {
 		log.Printf("read error for %q (%s): %v", name, addr, err)
 	}
