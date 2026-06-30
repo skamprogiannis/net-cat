@@ -11,17 +11,14 @@ func formatMessage(name, message string, t time.Time) string {
 	return fmt.Sprintf("[%s][%s]: %s", t.Format("2006-01-02 15:04:05"), name, message)
 }
 
-// formatPrompt builds the simple input marker shown after live chat output.
-func formatPrompt() string {
-	return "> "
-}
+const messagePrompt = "> "
 
 // sendPrompt writes a fresh input prompt to a single client.
 func sendPrompt(client *Client) error {
 	mu.Lock()
 	defer mu.Unlock()
 
-	if _, err := client.writer.WriteString(formatPrompt()); err != nil {
+	if _, err := client.writer.WriteString(messagePrompt); err != nil {
 		return err
 	}
 	return client.writer.Flush()
@@ -40,7 +37,7 @@ func sendLiveLineLocked(client *Client, message string, leadingNewline bool) err
 			return err
 		}
 	}
-	if _, err := client.writer.WriteString(message + "\n" + formatPrompt()); err != nil {
+	if _, err := client.writer.WriteString(message + "\n" + messagePrompt); err != nil {
 		return err
 	}
 	return client.writer.Flush()

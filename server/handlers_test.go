@@ -92,15 +92,15 @@ func TestHandleClient_BroadcastsMessageToSender(t *testing.T) {
 		t.Fatalf("expected join notification first, got %q", joinLine)
 	}
 
-	prompt := make([]byte, len(formatPrompt()))
+	prompt := make([]byte, len(messagePrompt))
 	if _, err := io.ReadFull(patrickConn, prompt); err != nil {
 		t.Fatalf("read Patrick prompt: %v", err)
 	}
-	if string(prompt) != formatPrompt() {
+	if string(prompt) != messagePrompt {
 		t.Fatalf("expected Patrick prompt, got %q", string(prompt))
 	}
 
-	wantSenderLen := len(formatMessage("Patrick", "hello everyone", time.Now()) + "\n" + formatPrompt())
+	wantSenderLen := len(formatMessage("Patrick", "hello everyone", time.Now()) + "\n" + messagePrompt)
 	patrickRead := readStringAsync(patrickConn, wantSenderLen)
 	bobRead := readStringAsync(bobConn, wantSenderLen+1)
 
@@ -193,7 +193,7 @@ func TestHandleClient_SendsEventHistoryBeforePrompt(t *testing.T) {
 	want := "Alice has joined our chat...\n" +
 		"[2020-01-20 15:48:41][Alice]: hello\n" +
 		"Alice has left our chat...\n" +
-		formatPrompt()
+		messagePrompt
 	got := make([]byte, len(want))
 	if _, err := io.ReadFull(clientConn, got); err != nil {
 		t.Fatalf("read history and prompt: %v", err)
@@ -373,12 +373,12 @@ func readIncomingLiveLine(t *testing.T, reader *bufio.Reader) string {
 		t.Fatalf("read live line: %v", err)
 	}
 
-	prompt := make([]byte, len(formatPrompt()))
+	prompt := make([]byte, len(messagePrompt))
 	if _, err := io.ReadFull(reader, prompt); err != nil {
 		t.Fatalf("read prompt redraw: %v", err)
 	}
-	if string(prompt) != formatPrompt() {
-		t.Fatalf("prompt redraw = %q, want %q", string(prompt), formatPrompt())
+	if string(prompt) != messagePrompt {
+		t.Fatalf("prompt redraw = %q, want %q", string(prompt), messagePrompt)
 	}
 
 	return line

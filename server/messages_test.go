@@ -47,12 +47,6 @@ func TestFormatMessage(t *testing.T) {
 	}
 }
 
-func TestFormatPrompt(t *testing.T) {
-	if got := formatPrompt(); got != "> " {
-		t.Fatalf("formatPrompt() = %q, want %q", got, "> ")
-	}
-}
-
 func TestAddMessageToHistory(t *testing.T) {
 	resetServerState(t)
 
