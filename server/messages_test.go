@@ -21,19 +21,19 @@ func TestFormatMessage(t *testing.T) {
 			name:    "basic message",
 			user:    "Daniel",
 			message: "hello",
-			want:    "[2020-01-20 15:48:41][Daniel]:hello",
+			want:    "[2020-01-20 15:48:41][Daniel]: hello",
 		},
 		{
 			name:    "name with spaces",
 			user:    "Daniel Tymoshenko",
 			message: "hello",
-			want:    "[2020-01-20 15:48:41][Daniel Tymoshenko]:hello",
+			want:    "[2020-01-20 15:48:41][Daniel Tymoshenko]: hello",
 		},
 		{
 			name:    "message with special characters",
 			user:    "Daniel",
 			message: "hello: [ok] #1!",
-			want:    "[2020-01-20 15:48:41][Daniel]:hello: [ok] #1!",
+			want:    "[2020-01-20 15:48:41][Daniel]: hello: [ok] #1!",
 		},
 	}
 
@@ -47,15 +47,21 @@ func TestFormatMessage(t *testing.T) {
 	}
 }
 
+func TestFormatPrompt(t *testing.T) {
+	if got := formatPrompt(); got != "> " {
+		t.Fatalf("formatPrompt() = %q, want %q", got, "> ")
+	}
+}
+
 func TestAddMessageToHistory(t *testing.T) {
 	resetServerState(t)
 
-	addMessageToHistory("[2020-01-20 15:48:41][Daniel]:hello")
+	addMessageToHistory("[2020-01-20 15:48:41][Daniel]: hello")
 
 	if len(messageHistory) != 1 {
 		t.Fatalf("expected 1 history entry, got %d", len(messageHistory))
 	}
-	if messageHistory[0] != "[2020-01-20 15:48:41][Daniel]:hello" {
+	if messageHistory[0] != "[2020-01-20 15:48:41][Daniel]: hello" {
 		t.Fatalf("unexpected history entry %q", messageHistory[0])
 	}
 }
@@ -72,8 +78,9 @@ func TestSendHistory(t *testing.T) {
 	clientConn.SetDeadline(deadline)
 
 	messageHistory = []string{
-		"[2020-01-20 15:48:41][Daniel]:hello",
-		"[2020-01-20 15:49:02][George]:what's up",
+		"Daniel has joined our chat...",
+		"[2020-01-20 15:48:41][Daniel]: hello",
+		"Daniel has left our chat...",
 	}
 	client := &Client{
 		conn:   serverConn,
@@ -86,8 +93,9 @@ func TestSendHistory(t *testing.T) {
 		errCh <- sendHistory(client)
 	}()
 
-	want := "[2020-01-20 15:48:41][Daniel]:hello\n" +
-		"[2020-01-20 15:49:02][George]:what's up\n"
+	want := "Daniel has joined our chat...\n" +
+		"[2020-01-20 15:48:41][Daniel]: hello\n" +
+		"Daniel has left our chat...\n"
 	got := make([]byte, len(want))
 	if _, err := io.ReadFull(clientConn, got); err != nil {
 		t.Fatalf("read history: %v", err)

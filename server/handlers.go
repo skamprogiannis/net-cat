@@ -7,11 +7,15 @@ import (
 )
 
 func notifyJoin(client *Client) {
-	broadcast(client.name+" has joined our chat...", client)
+	message := client.name + " has joined our chat..."
+	addMessageToHistory(message)
+	broadcast(message, client)
 }
 
 func notifyLeave(client *Client) {
-	broadcast(client.name+" has left our chat...", client)
+	message := client.name + " has left our chat..."
+	addMessageToHistory(message)
+	broadcast(message, client)
 }
 
 // disconnectClient removes the client and only announces a leave if the join

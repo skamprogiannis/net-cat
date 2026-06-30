@@ -2,6 +2,7 @@ package server
 
 import (
 	"bufio"
+	"io"
 	"net"
 	"testing"
 	"time"
@@ -26,6 +27,7 @@ func setupTwoClients(t *testing.T) (*Client, *Client, net.Conn, net.Conn) {
 // the returned conns let the test read what each terminal-side client receives.
 func setupBroadcastClients(t *testing.T, names ...string) ([]*Client, []net.Conn) {
 	t.Helper()
+	resetServerState(t)
 
 	testClients := make([]*Client, 0, len(names))
 	conns := make([]net.Conn, 0, len(names))
@@ -65,6 +67,16 @@ func readLineAsync(conn net.Conn) <-chan readResult {
 	return ch
 }
 
+func readStringAsync(conn net.Conn, length int) <-chan readResult {
+	ch := make(chan readResult, 1)
+	go func() {
+		buf := make([]byte, length)
+		_, err := io.ReadFull(conn, buf)
+		ch <- readResult{line: string(buf), err: err}
+	}()
+	return ch
+}
+
 // requireReadLine asserts that an async read produced want before the timeout.
 func requireReadLine(t *testing.T, ch <-chan readResult, want string) {
 	t.Helper()
@@ -100,9 +112,10 @@ func requireReadLineValue(t *testing.T, ch <-chan readResult) string {
 func TestBroadcast_SendsToAllClientsWithoutExcludedSender(t *testing.T) {
 	_, conns := setupBroadcastClients(t, "Patrick", "Bob", "George")
 
-	patrickRead := readLineAsync(conns[0])
-	bobRead := readLineAsync(conns[1])
-	georgeRead := readLineAsync(conns[2])
+	want := "\nhello\n> "
+	patrickRead := readStringAsync(conns[0], len(want))
+	bobRead := readStringAsync(conns[1], len(want))
+	georgeRead := readStringAsync(conns[2], len(want))
 
 	broadcastDone := make(chan struct{})
 	go func() {
@@ -110,9 +123,9 @@ func TestBroadcast_SendsToAllClientsWithoutExcludedSender(t *testing.T) {
 		close(broadcastDone)
 	}()
 
-	requireReadLine(t, patrickRead, "hello\n")
-	requireReadLine(t, bobRead, "hello\n")
-	requireReadLine(t, georgeRead, "hello\n")
+	requireReadLine(t, patrickRead, want)
+	requireReadLine(t, bobRead, want)
+	requireReadLine(t, georgeRead, want)
 
 	<-broadcastDone
 }
@@ -120,7 +133,8 @@ func TestBroadcast_SendsToAllClientsWithoutExcludedSender(t *testing.T) {
 func TestBroadcast_ExcludesSenderWhenProvided(t *testing.T) {
 	testClients, conns := setupBroadcastClients(t, "Patrick", "Bob")
 
-	bobRead := readLineAsync(conns[1])
+	want := "\nhello\n> "
+	bobRead := readStringAsync(conns[1], len(want))
 
 	broadcastDone := make(chan struct{})
 	go func() {
@@ -135,6 +149,6 @@ func TestBroadcast_ExcludesSenderWhenProvided(t *testing.T) {
 		t.Fatalf("Patrick should not receive his own message")
 	}
 
-	requireReadLine(t, bobRead, "hello\n")
+	requireReadLine(t, bobRead, want)
 	<-broadcastDone
 }

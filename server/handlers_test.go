@@ -61,10 +61,7 @@ func TestHandleClient_SkipsEmptyMessages(t *testing.T) {
 	patrickConn, bobConn, done := startJoiningClient(t)
 
 	reader := bufio.NewReader(bobConn)
-	joinLine, err := reader.ReadString('\n')
-	if err != nil {
-		t.Fatalf("read join notification: %v", err)
-	}
+	joinLine := readIncomingLiveLine(t, reader)
 	if joinLine != "Patrick has joined our chat...\n" {
 		t.Fatalf("expected join notification first, got %q", joinLine)
 	}
@@ -73,15 +70,16 @@ func TestHandleClient_SkipsEmptyMessages(t *testing.T) {
 		t.Fatalf("write messages: %v", err)
 	}
 
-	line, err := reader.ReadString('\n')
-	if err != nil {
-		t.Fatalf("read broadcast: %v", err)
-	}
-	if !strings.HasSuffix(line, "][Patrick]:hello\n") {
+	line := readIncomingLiveLine(t, reader)
+	if !strings.HasSuffix(line, "][Patrick]: hello\n") {
 		t.Fatalf("expected only formatted trimmed message, got %q", line)
 	}
 
 	patrickConn.Close()
+	leaveLine := readIncomingLiveLine(t, reader)
+	if leaveLine != "Patrick has left our chat...\n" {
+		t.Fatalf("got %q, want leave notification", leaveLine)
+	}
 	<-done
 }
 
@@ -89,40 +87,41 @@ func TestHandleClient_BroadcastsMessageToSender(t *testing.T) {
 	patrickConn, bobConn, done := startJoiningClientWithoutPromptDrain(t)
 
 	bobReader := bufio.NewReader(bobConn)
-	joinLine, err := bobReader.ReadString('\n')
-	if err != nil {
-		t.Fatalf("read join notification: %v", err)
-	}
+	joinLine := readIncomingLiveLine(t, bobReader)
 	if joinLine != "Patrick has joined our chat...\n" {
 		t.Fatalf("expected join notification first, got %q", joinLine)
 	}
 
-	wantPromptLen := len(formatPrompt("Patrick", time.Now()))
-	prompt := make([]byte, wantPromptLen)
+	prompt := make([]byte, len(formatPrompt()))
 	if _, err := io.ReadFull(patrickConn, prompt); err != nil {
 		t.Fatalf("read Patrick prompt: %v", err)
 	}
-	if !strings.HasSuffix(string(prompt), "][Patrick]:") {
+	if string(prompt) != formatPrompt() {
 		t.Fatalf("expected Patrick prompt, got %q", string(prompt))
 	}
 
-	patrickRead := readLineAsync(patrickConn)
-	bobRead := readLineAsync(bobConn)
+	wantSenderLen := len(formatMessage("Patrick", "hello everyone", time.Now()) + "\n" + formatPrompt())
+	patrickRead := readStringAsync(patrickConn, wantSenderLen)
+	bobRead := readStringAsync(bobConn, wantSenderLen+1)
 
 	if _, err := patrickConn.Write([]byte("hello everyone\n")); err != nil {
 		t.Fatalf("write message: %v", err)
 	}
 
-	patrickLine := requireReadLineValue(t, patrickRead)
-	bobLine := requireReadLineValue(t, bobRead)
-	if patrickLine != bobLine {
-		t.Fatalf("sender got %q, receiver got %q", patrickLine, bobLine)
+	patrickOutput := requireReadLineValue(t, patrickRead)
+	bobOutput := requireReadLineValue(t, bobRead)
+	if bobOutput != "\n"+patrickOutput {
+		t.Fatalf("sender got %q, receiver got %q", patrickOutput, bobOutput)
 	}
-	if !strings.HasSuffix(patrickLine, "][Patrick]:hello everyone\n") {
-		t.Fatalf("expected formatted Patrick message, got %q", patrickLine)
+	if !strings.Contains(patrickOutput, "][Patrick]: hello everyone\n> ") {
+		t.Fatalf("expected formatted Patrick message and prompt, got %q", patrickOutput)
 	}
 
 	patrickConn.Close()
+	leaveLine := readIncomingLiveLine(t, bufio.NewReader(bobConn))
+	if leaveLine != "Patrick has left our chat...\n" {
+		t.Fatalf("got %q, want leave notification", leaveLine)
+	}
 	<-done
 }
 
@@ -130,10 +129,7 @@ func TestHandleClient_DoesNotBroadcastOnlyEmptyMessages(t *testing.T) {
 	patrickConn, bobConn, done := startJoiningClient(t)
 
 	reader := bufio.NewReader(bobConn)
-	joinLine, err := reader.ReadString('\n')
-	if err != nil {
-		t.Fatalf("read join notification: %v", err)
-	}
+	joinLine := readIncomingLiveLine(t, reader)
 	if joinLine != "Patrick has joined our chat...\n" {
 		t.Fatalf("expected join notification first, got %q", joinLine)
 	}
@@ -156,14 +152,57 @@ func TestHandleClient_DoesNotBroadcastOnlyEmptyMessages(t *testing.T) {
 	}
 	patrickConn.Close()
 
-	leaveLine, err := reader.ReadString('\n')
-	if err != nil {
-		t.Fatalf("read leave notification: %v", err)
-	}
+	leaveLine := readIncomingLiveLine(t, reader)
 	if leaveLine != "Patrick has left our chat...\n" {
 		t.Fatalf("got %q, want leave notification", leaveLine)
 	}
 
+	<-done
+}
+
+func TestHandleClient_SendsEventHistoryBeforePrompt(t *testing.T) {
+	resetServerState(t)
+	messageHistory = []string{
+		"Alice has joined our chat...",
+		"[2020-01-20 15:48:41][Alice]: hello",
+		"Alice has left our chat...",
+	}
+	connectionCount = 1
+
+	serverConn, clientConn := net.Pipe()
+	deadline := time.Now().Add(time.Second)
+	serverConn.SetDeadline(deadline)
+	clientConn.SetDeadline(deadline)
+
+	t.Cleanup(func() {
+		serverConn.Close()
+		clientConn.Close()
+	})
+
+	done := make(chan struct{})
+	go func() {
+		handleClient(serverConn)
+		close(done)
+	}()
+
+	readFullWelcome(t, clientConn)
+	if _, err := clientConn.Write([]byte("George\n")); err != nil {
+		t.Fatalf("write name: %v", err)
+	}
+
+	want := "Alice has joined our chat...\n" +
+		"[2020-01-20 15:48:41][Alice]: hello\n" +
+		"Alice has left our chat...\n" +
+		formatPrompt()
+	got := make([]byte, len(want))
+	if _, err := io.ReadFull(clientConn, got); err != nil {
+		t.Fatalf("read history and prompt: %v", err)
+	}
+	if string(got) != want {
+		t.Fatalf("history and prompt = %q, want %q", string(got), want)
+	}
+
+	clientConn.Close()
 	<-done
 }
 
@@ -176,13 +215,13 @@ func TestNotifyJoin(t *testing.T) {
 		close(done)
 	}()
 
-	line, err := bufio.NewReader(bobConn).ReadString('\n')
-	if err != nil {
-		t.Fatalf("read join notification: %v", err)
-	}
+	line := readIncomingLiveLine(t, bufio.NewReader(bobConn))
 	want := "Patrick has joined our chat...\n"
 	if line != want {
 		t.Fatalf("got %q, want %q", line, want)
+	}
+	if len(messageHistory) != 1 || messageHistory[0] != "Patrick has joined our chat..." {
+		t.Fatalf("history = %q, want join notification", messageHistory)
 	}
 
 	<-done
@@ -191,15 +230,37 @@ func TestNotifyJoin(t *testing.T) {
 func TestHandleClient_NotifiesOnJoin(t *testing.T) {
 	patrickConn, bobConn, done := startJoiningClient(t)
 
-	line, err := bufio.NewReader(bobConn).ReadString('\n')
-	if err != nil {
-		t.Fatalf("read join notification: %v", err)
-	}
+	line := readIncomingLiveLine(t, bufio.NewReader(bobConn))
 	if line != "Patrick has joined our chat...\n" {
 		t.Fatalf("got %q, want join notification", line)
 	}
 
 	patrickConn.Close()
+	leaveLine := readIncomingLiveLine(t, bufio.NewReader(bobConn))
+	if leaveLine != "Patrick has left our chat...\n" {
+		t.Fatalf("got %q, want leave notification", leaveLine)
+	}
+	<-done
+}
+
+func TestNotifyLeaveStoresHistory(t *testing.T) {
+	patrick, _, _, bobConn := setupTwoClients(t)
+
+	done := make(chan struct{})
+	go func() {
+		notifyLeave(patrick)
+		close(done)
+	}()
+
+	line := readIncomingLiveLine(t, bufio.NewReader(bobConn))
+	want := "Patrick has left our chat...\n"
+	if line != want {
+		t.Fatalf("got %q, want %q", line, want)
+	}
+	if len(messageHistory) != 1 || messageHistory[0] != "Patrick has left our chat..." {
+		t.Fatalf("history = %q, want leave notification", messageHistory)
+	}
+
 	<-done
 }
 
@@ -212,8 +273,8 @@ func startJoiningClient(t *testing.T) (patrickConn, bobConn net.Conn, done chan 
 	t.Helper()
 	patrickConn, bobConn, done = startJoiningClientWithoutPromptDrain(t)
 
-	// The server sends each client its own timestamped prompt (sendPrompt) after
-	// joining and after every message. On a synchronous net.Pipe those writes
+	// The server sends each client its own prompt after joining and after every
+	// message. On a synchronous net.Pipe those writes
 	// block until someone reads, so drain Patrick's side in the background; the
 	// tests using this helper only assert on what Bob receives.
 	go func() {
@@ -294,4 +355,31 @@ func readFullWelcome(t *testing.T, conn net.Conn) {
 	if string(got) != want {
 		t.Fatalf("welcome = %q, want %q", string(got), want)
 	}
+}
+
+func readIncomingLiveLine(t *testing.T, reader *bufio.Reader) string {
+	t.Helper()
+
+	prefix, err := reader.ReadString('\n')
+	if err != nil {
+		t.Fatalf("read live line prefix: %v", err)
+	}
+	if prefix != "\n" {
+		t.Fatalf("live line prefix = %q, want newline", prefix)
+	}
+
+	line, err := reader.ReadString('\n')
+	if err != nil {
+		t.Fatalf("read live line: %v", err)
+	}
+
+	prompt := make([]byte, len(formatPrompt()))
+	if _, err := io.ReadFull(reader, prompt); err != nil {
+		t.Fatalf("read prompt redraw: %v", err)
+	}
+	if string(prompt) != formatPrompt() {
+		t.Fatalf("prompt redraw = %q, want %q", string(prompt), formatPrompt())
+	}
+
+	return line
 }

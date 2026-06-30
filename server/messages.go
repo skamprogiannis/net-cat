@@ -8,21 +8,39 @@ import (
 )
 
 func formatMessage(name, message string, t time.Time) string {
-	return fmt.Sprintf("[%s][%s]:%s", t.Format("2006-01-02 15:04:05"), name, message)
+	return fmt.Sprintf("[%s][%s]: %s", t.Format("2006-01-02 15:04:05"), name, message)
 }
 
-// formatPrompt builds the timestamped prefix shown to a client before they
-// type.
-func formatPrompt(name string, t time.Time) string {
-	return fmt.Sprintf("[%s][%s]:", t.Format("2006-01-02 15:04:05"), name)
+// formatPrompt builds the simple input marker shown after live chat output.
+func formatPrompt() string {
+	return "> "
 }
 
-// sendPrompt writes a fresh timestamped prompt to a single client.
+// sendPrompt writes a fresh input prompt to a single client.
 func sendPrompt(client *Client) error {
 	mu.Lock()
 	defer mu.Unlock()
 
-	if _, err := client.writer.WriteString(formatPrompt(client.name, time.Now())); err != nil {
+	if _, err := client.writer.WriteString(formatPrompt()); err != nil {
+		return err
+	}
+	return client.writer.Flush()
+}
+
+func sendLiveLine(client *Client, message string, leadingNewline bool) error {
+	mu.Lock()
+	defer mu.Unlock()
+
+	return sendLiveLineLocked(client, message, leadingNewline)
+}
+
+func sendLiveLineLocked(client *Client, message string, leadingNewline bool) error {
+	if leadingNewline {
+		if _, err := client.writer.WriteString("\n"); err != nil {
+			return err
+		}
+	}
+	if _, err := client.writer.WriteString(message + "\n" + formatPrompt()); err != nil {
 		return err
 	}
 	return client.writer.Flush()
@@ -59,12 +77,11 @@ func handleClientMessages(client *Client) error {
 
 		formatted := formatMessage(client.name, message, time.Now())
 		addMessageToHistory(formatted)
-		broadcast(formatted, nil)
 
-		// Re-prompt the sender so their next line carries a timestamp too.
-		if err := sendPrompt(client); err != nil {
+		if err := sendLiveLine(client, formatted, false); err != nil {
 			return err
 		}
+		broadcast(formatted, client)
 	}
 	return scanner.Err()
 }
