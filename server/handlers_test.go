@@ -85,6 +85,47 @@ func TestHandleClient_SkipsEmptyMessages(t *testing.T) {
 	<-done
 }
 
+func TestHandleClient_BroadcastsMessageToSender(t *testing.T) {
+	patrickConn, bobConn, done := startJoiningClientWithoutPromptDrain(t)
+
+	bobReader := bufio.NewReader(bobConn)
+	joinLine, err := bobReader.ReadString('\n')
+	if err != nil {
+		t.Fatalf("read join notification: %v", err)
+	}
+	if joinLine != "Patrick has joined our chat...\n" {
+		t.Fatalf("expected join notification first, got %q", joinLine)
+	}
+
+	wantPromptLen := len(formatPrompt("Patrick", time.Now()))
+	prompt := make([]byte, wantPromptLen)
+	if _, err := io.ReadFull(patrickConn, prompt); err != nil {
+		t.Fatalf("read Patrick prompt: %v", err)
+	}
+	if !strings.HasSuffix(string(prompt), "][Patrick]:") {
+		t.Fatalf("expected Patrick prompt, got %q", string(prompt))
+	}
+
+	patrickRead := readLineAsync(patrickConn)
+	bobRead := readLineAsync(bobConn)
+
+	if _, err := patrickConn.Write([]byte("hello everyone\n")); err != nil {
+		t.Fatalf("write message: %v", err)
+	}
+
+	patrickLine := requireReadLineValue(t, patrickRead)
+	bobLine := requireReadLineValue(t, bobRead)
+	if patrickLine != bobLine {
+		t.Fatalf("sender got %q, receiver got %q", patrickLine, bobLine)
+	}
+	if !strings.HasSuffix(patrickLine, "][Patrick]:hello everyone\n") {
+		t.Fatalf("expected formatted Patrick message, got %q", patrickLine)
+	}
+
+	patrickConn.Close()
+	<-done
+}
+
 func TestHandleClient_DoesNotBroadcastOnlyEmptyMessages(t *testing.T) {
 	patrickConn, bobConn, done := startJoiningClient(t)
 
@@ -169,6 +210,30 @@ func TestHandleClient_NotifiesOnJoin(t *testing.T) {
 // when handleClient returns.
 func startJoiningClient(t *testing.T) (patrickConn, bobConn net.Conn, done chan struct{}) {
 	t.Helper()
+	patrickConn, bobConn, done = startJoiningClientWithoutPromptDrain(t)
+
+	// The server sends each client its own timestamped prompt (sendPrompt) after
+	// joining and after every message. On a synchronous net.Pipe those writes
+	// block until someone reads, so drain Patrick's side in the background; the
+	// tests using this helper only assert on what Bob receives.
+	go func() {
+		buf := make([]byte, 256)
+		for {
+			if _, err := patrickConn.Read(buf); err != nil {
+				return
+			}
+		}
+	}()
+
+	return patrickConn, bobConn, done
+}
+
+// startJoiningClientWithoutPromptDrain registers Bob as an already-connected
+// client and drives Patrick through the join flow without reading Patrick's
+// post-join prompt. Tests that need to assert on Patrick's terminal output can
+// read that prompt themselves before sending messages.
+func startJoiningClientWithoutPromptDrain(t *testing.T) (patrickConn, bobConn net.Conn, done chan struct{}) {
+	t.Helper()
 	resetServerState(t)
 
 	patrickServer, patrickConn := net.Pipe()
@@ -200,19 +265,6 @@ func startJoiningClient(t *testing.T) (patrickConn, bobConn net.Conn, done chan 
 	if _, err := patrickConn.Write([]byte("Patrick\n")); err != nil {
 		t.Fatalf("write name: %v", err)
 	}
-
-	// The server sends each client its own timestamped prompt (sendPrompt) after
-	// joining and after every message. On a synchronous net.Pipe those writes
-	// block until someone reads, so drain Patrick's side in the background; the
-	// tests only assert on what Bob receives.
-	go func() {
-		buf := make([]byte, 256)
-		for {
-			if _, err := patrickConn.Read(buf); err != nil {
-				return
-			}
-		}
-	}()
 
 	return patrickConn, bobConn, done
 }

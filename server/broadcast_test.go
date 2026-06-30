@@ -82,25 +82,42 @@ func requireReadLine(t *testing.T, ch <-chan readResult, want string) {
 	}
 }
 
-func TestBroadcast_SendsToAllReceivers(t *testing.T) {
-	testClients, conns := setupBroadcastClients(t, "Patrick", "Bob", "George")
+func requireReadLineValue(t *testing.T, ch <-chan readResult) string {
+	t.Helper()
 
+	select {
+	case result := <-ch:
+		if result.err != nil {
+			t.Fatalf("read broadcast: %v", result.err)
+		}
+		return result.line
+	case <-time.After(time.Second):
+		t.Fatal("timed out waiting for broadcast")
+		return ""
+	}
+}
+
+func TestBroadcast_SendsToAllClientsWithoutExcludedSender(t *testing.T) {
+	_, conns := setupBroadcastClients(t, "Patrick", "Bob", "George")
+
+	patrickRead := readLineAsync(conns[0])
 	bobRead := readLineAsync(conns[1])
 	georgeRead := readLineAsync(conns[2])
 
 	broadcastDone := make(chan struct{})
 	go func() {
-		broadcast("hello", testClients[0])
+		broadcast("hello", nil)
 		close(broadcastDone)
 	}()
 
+	requireReadLine(t, patrickRead, "hello\n")
 	requireReadLine(t, bobRead, "hello\n")
 	requireReadLine(t, georgeRead, "hello\n")
 
 	<-broadcastDone
 }
 
-func TestBroadcast_SenderDoesNotGetMessage(t *testing.T) {
+func TestBroadcast_ExcludesSenderWhenProvided(t *testing.T) {
 	testClients, conns := setupBroadcastClients(t, "Patrick", "Bob")
 
 	bobRead := readLineAsync(conns[1])

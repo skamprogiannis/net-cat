@@ -12,8 +12,7 @@ func formatMessage(name, message string, t time.Time) string {
 }
 
 // formatPrompt builds the timestamped prefix shown to a client before they
-// type. Without it the sender (whom broadcast skips) only sees their terminal's
-// raw echo, with no date, while everyone else sees the formatted message.
+// type.
 func formatPrompt(name string, t time.Time) string {
 	return fmt.Sprintf("[%s][%s]:", t.Format("2006-01-02 15:04:05"), name)
 }
@@ -48,7 +47,8 @@ func sendHistory(client *Client) error {
 }
 
 // handleClientMessages reads raw client input, filters empty lines at the input
-// boundary, then records and broadcasts formatted chat messages.
+// boundary, then records and broadcasts formatted chat messages to every
+// connected client, including the sender.
 func handleClientMessages(client *Client) error {
 	scanner := bufio.NewScanner(client.conn)
 	for scanner.Scan() {
@@ -59,7 +59,7 @@ func handleClientMessages(client *Client) error {
 
 		formatted := formatMessage(client.name, message, time.Now())
 		addMessageToHistory(formatted)
-		broadcast(formatted, client)
+		broadcast(formatted, nil)
 
 		// Re-prompt the sender so their next line carries a timestamp too.
 		if err := sendPrompt(client); err != nil {
