@@ -4,7 +4,7 @@ import "sync"
 
 var (
 	clients         []*Client
-	messageHistory []string
+	messageHistory  []string
 	connectionCount int
 	mu              sync.Mutex
 )
