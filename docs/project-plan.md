@@ -1,6 +1,11 @@
 # TCPChat — NetCat Clone
 ## Product Requirements Document
 
+> [!NOTE]
+> This is the team's original planning document, retained as project history.
+> Some implementation details evolved during development; the root README and
+> automated tests are authoritative for the current behavior.
+
 **Team:** Daniel · George · Stefanos
 **Project Duration:** April 21 – May 11, 2025
 **Version:** 1.0
